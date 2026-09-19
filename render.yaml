@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: secret-network-tui
+    runtime: node
+    plan: free
+
+    buildCommand: echo "no build"
+    startCommand: node server.mjs
+
+    healthCheckPath: /health
+
+    envVars:
+      - key: SECRET_LCD
+        value: https://lcd.secret.mainnet.secret3.dev

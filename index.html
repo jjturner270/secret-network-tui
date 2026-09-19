@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Secret Network // TUI Explorer</title>
+  <style>
+    :root{
+      --bg:#0b0d0c;
+      --panel:#101311;
+      --panel2:#0d100e;
+      --ink:#e8eee8;
+      --muted:#8e998f;
+      --line:#2a312c;
+      --good:#9fe0b8;
+      --warn:#e8c77a;
+      --bad:#e39a9a;
+      --accent:#cbe7a7;
+      --mono: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;background:var(--bg);color:var(--ink);font-family:var(--mono);
+      font-size:13px;overflow:hidden;
+    }
+    button,input{font:inherit}
+    .app{
+      height:100vh;display:grid;
+      grid-template-rows:auto 1fr auto;
+      max-width:1600px;margin:0 auto;border-left:1px solid var(--line);border-right:1px solid var(--line);
+    }
+    .top{
+      display:grid;grid-template-columns:auto 1fr auto;gap:18px;align-items:center;
+      padding:8px 12px;border-bottom:1px solid var(--line);background:var(--panel2);
+    }
+    .brand{font-weight:800;letter-spacing:.04em}
+    .path{color:var(--muted)}
+    .state{display:flex;align-items:center;gap:8px}
+    .dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+    .dot.good{background:var(--good)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad)}
+    .workspace{
+      min-height:0;display:grid;grid-template-columns:270px minmax(0,1fr) 360px;
+    }
+    .pane{min-width:0;min-height:0;background:var(--panel)}
+    .pane + .pane{border-left:1px solid var(--line)}
+    .pane-head{
+      height:32px;display:flex;align-items:center;justify-content:space-between;
+      padding:0 10px;border-bottom:1px solid var(--line);background:var(--panel2);
+      text-transform:uppercase;font-size:11px;letter-spacing:.07em;
+    }
+    .pane-head .hint{color:var(--muted);text-transform:none;letter-spacing:0}
+    .scroll{height:calc(100% - 32px);overflow:auto}
+    .left .scroll{padding:8px}
+    .group{margin-bottom:14px}
+    .group-title{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin:0 0 5px 2px}
+    .kv{
+      display:grid;grid-template-columns:1fr auto;gap:8px;padding:4px 5px;
+      border-left:2px solid transparent;
+    }
+    .kv:hover{background:#141814}
+    .kv .k{color:var(--muted)}
+    .kv .v{font-weight:700;text-align:right}
+    .kv.good{border-left-color:var(--good)}
+    .kv.warn{border-left-color:var(--warn)}
+    .kv.bad{border-left-color:var(--bad)}
+
+    .center{display:grid;grid-template-rows:auto auto 1fr;min-height:0}
+    .summary{
+      padding:14px 14px 12px;border-bottom:1px solid var(--line);
+      background:linear-gradient(180deg,#111511 0%,#0f120f 100%);
+    }
+    .summary .eyebrow{color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.08em}
+    .summary h1{font-size:23px;line-height:1.15;margin:6px 0 7px;letter-spacing:-.03em}
+    .summary p{margin:0;color:#b7c0b8;line-height:1.45;max-width:900px}
+    .quick{
+      display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+      border-bottom:1px solid var(--line);
+    }
+    .quick-item{padding:9px 10px;border-right:1px solid var(--line)}
+    .quick-item:last-child{border-right:0}
+    .quick-item .qk{font-size:10px;color:var(--muted);text-transform:uppercase}
+    .quick-item .qv{font-size:16px;font-weight:800;margin-top:3px}
+    .feed{min-height:0;overflow:auto}
+    .event{
+      display:grid;grid-template-columns:86px 82px 1fr auto;gap:10px;
+      padding:7px 10px;border-bottom:1px solid #171c18;align-items:start;
+    }
+    .event:hover{background:#121612}
+    .event .time,.event .type{color:var(--muted)}
+    .event .type{font-weight:700}
+    .event .msg{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .event .meta{color:var(--muted)}
+    .event.block .type{color:var(--accent)}
+    .event.gov .type{color:var(--warn)}
+    .event.error .type{color:var(--bad)}
+
+    .right{display:grid;grid-template-rows:1fr 1fr;min-height:0}
+    .subpane{min-height:0}
+    .subpane + .subpane{border-top:1px solid var(--line)}
+    .subpane .body{height:calc(100% - 32px);overflow:auto;padding:8px 10px}
+    .meaning{
+      padding:8px 0;border-bottom:1px solid #171c18;line-height:1.4;
+    }
+    .meaning:last-child{border-bottom:0}
+    .meaning strong{color:var(--accent)}
+    .proposal{padding:8px 0;border-bottom:1px solid #171c18}
+    .proposal:last-child{border-bottom:0}
+    .proposal .id{color:var(--warn);font-size:10px}
+    .proposal .title{font-weight:800;margin-top:3px}
+    .proposal .desc{color:#adb7ae;margin-top:5px;line-height:1.35;font-size:12px}
+    .proposal .foot{color:var(--muted);font-size:10px;margin-top:5px}
+
+    .footer{
+      display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;
+      min-height:29px;padding:5px 10px;border-top:1px solid var(--line);background:var(--panel2);
+      color:var(--muted);font-size:11px;
+    }
+    .keys{display:flex;gap:12px;flex-wrap:wrap}
+    .key{color:var(--ink)}
+    .key b{color:var(--accent)}
+    .error{color:var(--bad)}
+    .dim{color:var(--muted)}
+    .empty{padding:10px;color:var(--muted)}
+
+    @media(max-width:1100px){
+      body{overflow:auto}
+      .app{height:auto;min-height:100vh}
+      .workspace{grid-template-columns:230px 1fr}
+      .right{grid-column:1 / -1;border-left:0!important;border-top:1px solid var(--line);grid-template-columns:1fr 1fr;grid-template-rows:none}
+      .right .subpane + .subpane{border-top:0;border-left:1px solid var(--line)}
+      .quick{grid-template-columns:repeat(3,1fr)}
+    }
+    @media(max-width:720px){
+      .workspace{display:block}
+      .pane + .pane{border-left:0;border-top:1px solid var(--line)}
+      .left .scroll,.feed,.subpane .body{max-height:none;height:auto}
+      .right{display:block}
+      .right .subpane + .subpane{border-left:0;border-top:1px solid var(--line)}
+      .quick{grid-template-columns:repeat(2,1fr)}
+      .top{grid-template-columns:1fr auto}
+      .path{display:none}
+      .footer{grid-template-columns:1fr}
+      .event{grid-template-columns:70px 64px 1fr}
+      .event .meta{display:none}
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">SECRET//OPS</div>
+    <div class="path">secret-4 / mainnet / live</div>
+    <div class="state"><span id="statusDot" class="dot"></span><span id="statusText">CONNECTING</span></div>
+  </header>
+
+  <main class="workspace">
+    <section class="pane left">
+      <div class="pane-head"><span>network</span><span class="hint">[g]</span></div>
+      <div class="scroll">
+        <div class="group">
+          <div class="group-title">core</div>
+          <div class="kv"><span class="k">height</span><span id="height" class="v">—</span></div>
+          <div class="kv"><span class="k">block age</span><span id="blockAge" class="v">—</span></div>
+          <div class="kv"><span class="k">block avg</span><span id="blockTime" class="v">—</span></div>
+          <div class="kv"><span class="k">current tx</span><span id="txCount" class="v">—</span></div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">staking</div>
+          <div class="kv"><span class="k">bonded validators</span><span id="bondedVals" class="v">—</span></div>
+          <div class="kv"><span class="k">known validators</span><span id="allVals" class="v">—</span></div>
+          <div class="kv"><span class="k">bonded SCRT</span><span id="bondedScrt" class="v">—</span></div>
+          <div class="kv"><span class="k">bonded ratio</span><span id="bondedRatio" class="v">—</span></div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">economics</div>
+          <div class="kv"><span class="k">inflation</span><span id="inflation" class="v">—</span></div>
+          <div class="kv"><span class="k">governance</span><span id="govCount" class="v">—</span></div>
+        </div>
+
+        <div class="group">
+          <div class="group-title">sources</div>
+          <div id="sources"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="pane center">
+      <div class="summary">
+        <div class="eyebrow">interpreted network state</div>
+        <h1 id="headline">Connecting to Secret Network…</h1>
+        <p id="subline">Building one coherent snapshot from public chain data.</p>
+      </div>
+
+      <div class="quick">
+        <div class="quick-item"><div class="qk">height</div><div id="qHeight" class="qv">—</div></div>
+        <div class="quick-item"><div class="qk">block avg</div><div id="qBlockTime" class="qv">—</div></div>
+        <div class="quick-item"><div class="qk">validators</div><div id="qValidators" class="qv">—</div></div>
+        <div class="quick-item"><div class="qk">bonded</div><div id="qBonded" class="qv">—</div></div>
+        <div class="quick-item"><div class="qk">inflation</div><div id="qInflation" class="qv">—</div></div>
+      </div>
+
+      <div id="feed" class="feed">
+        <div class="empty">Waiting for first observation…</div>
+      </div>
+    </section>
+
+    <aside class="pane right">
+      <section class="subpane">
+        <div class="pane-head"><span>meaning</span><span class="hint">derived</span></div>
+        <div id="meanings" class="body"><div class="empty">Waiting for enough data…</div></div>
+      </section>
+      <section class="subpane">
+        <div class="pane-head"><span>governance</span><span class="hint">active</span></div>
+        <div id="proposals" class="body"><div class="empty">Loading proposals…</div></div>
+      </section>
+    </aside>
+  </main>
+
+  <footer class="footer">
+    <div class="keys">
+      <span class="key"><b>g</b> network</span>
+      <span class="key"><b>b</b> blocks</span>
+      <span class="key"><b>v</b> validators</span>
+      <span class="key"><b>p</b> proposals</span>
+      <span class="key"><b>r</b> refresh</span>
+    </div>
+    <div id="footerState">browser → /api/snapshot</div>
+  </footer>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const fmtInt = n => Number.isFinite(+n) ? new Intl.NumberFormat('en-US',{maximumFractionDigits:0}).format(+n) : '—';
+const fmtCompact = n => Number.isFinite(+n) ? new Intl.NumberFormat('en-US',{notation:'compact',maximumFractionDigits:2}).format(+n) : '—';
+const fmtPct = n => Number.isFinite(+n) ? `${(+n*100).toFixed(2)}%` : '—';
+const esc = s => String(s ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
+const short = s => !s ? '—' : s.length > 20 ? `${s.slice(0,10)}…${s.slice(-7)}` : s;
+const age = iso => {
+  if(!iso) return '—';
+  const sec=Math.max(0,Math.round((Date.now()-new Date(iso).getTime())/1000));
+  if(sec<60)return `${sec}s`;
+  const m=Math.floor(sec/60); return `${m}m`;
+};
+const clock = iso => {
+  if(!iso) return '—';
+  return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+};
+
+function sourceClass(state){ return state==='ok'?'good':state==='stale'?'warn':'bad'; }
+
+function render(d){
+  const b=d.block||{};
+  const blockAge=b.time ? (Date.now()-new Date(b.time).getTime())/1000 : Infinity;
+  const degraded=(d.sources||[]).some(s=>s.state==='error');
+  const stale=(d.sources||[]).some(s=>s.state==='stale');
+  const state=blockAge<25 ? (degraded||stale?'degraded':'healthy') : 'stale';
+
+  $('statusDot').className=`dot ${state==='healthy'?'good':state==='degraded'?'warn':'bad'}`;
+  $('statusText').textContent=state.toUpperCase();
+
+  $('height').textContent=fmtInt(b.height);
+  $('blockAge').textContent=age(b.time);
+  $('blockTime').textContent=d.observedBlockTime?`${d.observedBlockTime.toFixed(2)}s`:'learning';
+  $('txCount').textContent=d.txCount ?? '—';
+  $('bondedVals').textContent=fmtInt(d.validators?.bonded);
+  $('allVals').textContent=fmtInt(d.validators?.total);
+  $('bondedScrt').textContent=d.staking?.bondedScrt!=null?`${fmtCompact(d.staking.bondedScrt)}`:'—';
+  $('bondedRatio').textContent=d.staking?.bondedRatio!=null?`${(d.staking.bondedRatio*100).toFixed(1)}%`:'—';
+  $('inflation').textContent=fmtPct(d.inflation);
+  $('govCount').textContent=fmtInt(d.proposals?.length ?? 0);
+
+  $('qHeight').textContent=fmtInt(b.height);
+  $('qBlockTime').textContent=d.observedBlockTime?`${d.observedBlockTime.toFixed(2)}s`:'—';
+  $('qValidators').textContent=`${fmtInt(d.validators?.bonded)}/${fmtInt(d.validators?.total)}`;
+  $('qBonded').textContent=d.staking?.bondedRatio!=null?`${(d.staking.bondedRatio*100).toFixed(1)}%`:'—';
+  $('qInflation').textContent=fmtPct(d.inflation);
+
+  if(state==='healthy'){
+    $('headline').textContent='Network is producing blocks normally.';
+    $('subline').textContent=`Latest block ${fmtInt(b.height)} arrived ${age(b.time)} ago. ${d.txCount===0?'Current block is quiet.':`${d.txCount??'—'} transactions observed in the current block.`}`;
+  }else if(state==='degraded'){
+    $('headline').textContent='Network is live; some supporting data is degraded.';
+    $('subline').textContent='Block production is current. One or more secondary public endpoints are stale or unavailable, so the last good values remain visible.';
+  }else{
+    $('headline').textContent='Current network state could not be confirmed.';
+    $('subline').textContent='The latest block observation is stale or unavailable.';
+  }
+
+  $('sources').innerHTML=(d.sources||[]).map(s=>`
+    <div class="kv ${sourceClass(s.state)}">
+      <span class="k">${esc(s.name)}</span>
+      <span class="v">${esc(s.state)} ${esc(s.age||'')}</span>
+    </div>`).join('') || '<div class="empty">no sources</div>';
+
+  const blockEvents=(d.blocks||[]).map(x=>`
+    <div class="event block">
+      <div class="time">${esc(clock(x.time))}</div>
+      <div class="type">BLOCK</div>
+      <div class="msg">height ${fmtInt(x.height)} · ${x.txCount ?? '—'} tx · ${esc(short(x.hash))}</div>
+      <div class="meta">${esc(age(x.time))} ago</div>
+    </div>`);
+
+  const govEvents=(d.proposals||[]).slice(0,3).map(p=>`
+    <div class="event gov">
+      <div class="time">—</div>
+      <div class="type">GOV</div>
+      <div class="msg">#${esc(p.id)} ${esc(p.title||'Untitled proposal')}</div>
+      <div class="meta">voting</div>
+    </div>`);
+
+  const errorEvents=(d.sources||[]).filter(s=>s.state==='error').map(s=>`
+    <div class="event error">
+      <div class="time">now</div>
+      <div class="type">SOURCE</div>
+      <div class="msg">${esc(s.name)} unavailable${s.error?` · ${esc(s.error)}`:''}</div>
+      <div class="meta">degraded</div>
+    </div>`);
+
+  $('feed').innerHTML=[...errorEvents,...govEvents,...blockEvents].join('') || '<div class="empty">no events</div>';
+
+  const meanings=[];
+  if(d.observedBlockTime) meanings.push(`<div class="meaning"><strong>Blocks are moving.</strong> Observed interval is ~${d.observedBlockTime.toFixed(2)} seconds.</div>`);
+  if(d.validators?.bonded!=null) meanings.push(`<div class="meaning"><strong>${fmtInt(d.validators.bonded)} validators are bonded.</strong> ${d.validators.total?`${fmtInt(d.validators.total)} validators are visible through staking.`:''}</div>`);
+  if(d.staking?.bondedRatio!=null) meanings.push(`<div class="meaning"><strong>${(d.staking.bondedRatio*100).toFixed(1)}% of staking tokens are bonded.</strong> Remaining stake is outside the bonded pool.</div>`);
+  if(d.txCount===0) meanings.push(`<div class="meaning"><strong>The current block is quiet.</strong> No transactions were returned for height ${fmtInt(b.height)}.</div>`);
+  if(d.txCount>0) meanings.push(`<div class="meaning"><strong>Current block has activity.</strong> ${fmtInt(d.txCount)} transactions were returned for height ${fmtInt(b.height)}.</div>`);
+  $('meanings').innerHTML=meanings.join('')||'<div class="empty">waiting for enough data</div>';
+
+  $('proposals').innerHTML=(d.proposals||[]).slice(0,5).map(p=>`
+    <div class="proposal">
+      <div class="id">#${esc(p.id||'?')} / VOTING</div>
+      <div class="title">${esc(p.title||'Untitled proposal')}</div>
+      ${p.summary?`<div class="desc">${esc(p.summary)}</div>`:''}
+      <div class="foot">${p.votingEnd?`ends ${esc(new Date(p.votingEnd).toLocaleString())}`:'voting period active'}</div>
+    </div>`).join('') || '<div class="empty">no voting proposals returned</div>';
+
+  $('footerState').textContent=`snapshot ${age(d.generatedAt)} ago · browser → /api/snapshot`;
+}
+
+async function load(){
+  try{
+    const r=await fetch('/api/snapshot',{cache:'no-store'});
+    if(!r.ok) throw new Error(`snapshot ${r.status}`);
+    render(await r.json());
+  }catch(e){
+    $('statusDot').className='dot bad';
+    $('statusText').textContent='DISCONNECTED';
+    $('headline').textContent='Local snapshot service is unavailable.';
+    $('subline').textContent='Run "node server.mjs" and open the local server instead of the HTML file directly.';
+    $('footerState').innerHTML=`<span class="error">${esc(e.message)}</span>`;
+  }
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.key.toLowerCase()==='r') load();
+  if(e.key.toLowerCase()==='g') document.querySelector('.left')?.scrollIntoView({behavior:'smooth'});
+  if(e.key.toLowerCase()==='p') document.getElementById('proposals')?.scrollIntoView({behavior:'smooth'});
+  if(e.key.toLowerCase()==='b') document.getElementById('feed')?.scrollTo({top:0,behavior:'smooth'});
+});
+
+load();
+setInterval(load,6000);
+</script>
+</body>
+</html>
